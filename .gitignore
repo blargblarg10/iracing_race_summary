@@ -1,0 +1,4 @@
+.venv
+**/credentials.cfg
+**/test.*
+**/graphs

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Get the absolute path of the current directory
+CURRENT_DIR=$PWD
+
+# Check if the current directory contains .git directory
+if [ ! -d "$CURRENT_DIR/.git" ]; then
+    echo "Error: This script must be run from a directory containing a .git directory."
+    echo "Current directory: $CURRENT_DIR"
+    ls -la "$CURRENT_DIR"
+    exit 1
+fi
+
+# Check if the directory is a Conda environment
+if conda info --envs | grep -q "$CURRENT_DIR/.venv"; then
+    echo "Anaconda environment already exists."
+else
+    # Create the environment
+    echo "Creating Anaconda environment..."
+    conda create --prefix "$CURRENT_DIR/.venv" python -y
+fi
+
+# Activate the environment
+echo "Activating Anaconda environment..."
+source activate "$CURRENT_DIR/.venv"
+
+# Install project specific packages from python_requirements.txt if it exists
+if [ -f "$CURRENT_DIR/python_requirements.txt" ]; then
+    echo "Installing project specific packages..."
+    conda install --file "$CURRENT_DIR/python_requirements.txt" -y
+else
+    echo "No python_requirements.txt file found. Skipping installation of project specific packages."
+fi
+
+echo "Anaconda environment is activated and ready."

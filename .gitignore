@@ -2,3 +2,5 @@
 **/credentials.cfg
 **/test.*
 **/graphs
+**/*.pkl
+**/__pycache__

@@ -1,0 +1,4 @@
+pandas
+iracingdataapi
+matplotlib
+statsmodels

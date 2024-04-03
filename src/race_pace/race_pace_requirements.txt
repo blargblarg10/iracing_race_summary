@@ -1,0 +1,43 @@
+# Race GUI Requirements
+
+The race GUI will:
+
+1. **Initialize a PyQT GUI**
+   - The title of the GUI will be "iRacing Race Pace".
+   - Use the Fusion style
+
+2. **Tabs Setup**
+   - The GUI will have two tabs: "Generate" and "Settings".
+
+3. **Generate Tab**
+   - The Generate Tab will contain four columns with the following headers:
+     - "Series Name": a dropdown list from a provided list.
+     - "Series Year": a dropdown list of years starting from the current year and going back to 2010.
+     - "Season Quarter": a dropdown list from 0 to 3.
+     - "Race Week": a dropdown list from 0 to 12.
+
+4. **Initialization and JSON Handling**
+   - On loading, the GUI will attempt to load a JSON file containing:
+     - A list of series names.
+     - A variable called "start date".
+     - A variable called "last series name".
+   - If the JSON file does not exist, it will be created automatically with a default "start date" set to 12/12/2023 at 00:00 UTC.
+   - A function will be executed to determine the list of series names if the JSON file is created.
+   - If the function fails. An error message is given and the gui closes
+
+5. **Dropdown Prepopulation**
+   - The "Series Name" dropdown will be prepopulated with:
+     - The last series name if it exists in the JSON file.
+     - The first item in the list if the last series name does not exist.
+   - The "Series Year" dropdown will be prepopulated with the current year.
+   - The "Season Quarter" and "Race Week" dropdowns will be prepopulated based on the start date:
+     - If the start date is provided, the quarter is calculated by dividing the number of weeks since the start date by 13, then taking mod 4.
+     - The week is calculated as the number of weeks since the start date mod 13.
+
+6. **Settings Tab**
+   - The Settings Tab will contain:
+     - A "Sync" button that will run a function to rewrite the list to the JSON file.
+     - A calendar entry to pick a new start date, which will overwrite the one in the JSON file.
+
+7. **Run Functionality**
+   - In the Generate Tab, as long as all columns are set, a "Run" button will be available to execute a function with the chosen variables.

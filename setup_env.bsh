@@ -27,9 +27,18 @@ source activate "$CURRENT_DIR/.venv"
 # Install project specific packages from python_requirements.txt if it exists
 if [ -f "$CURRENT_DIR/python_requirements.txt" ]; then
     echo "Installing project specific packages..."
-    conda install --file "$CURRENT_DIR/python_requirements.txt" -y
+    pip install -r "$CURRENT_DIR/python_requirements.txt"
 else
     echo "No python_requirements.txt file found. Skipping installation of project specific packages."
 fi
 
+#aliases
+alias ll='ls -la'
+alias gits='git status'
+alias calc_pcup='python src/race_pace/iracing_pace_calc.py --pcup'
+alias calc_fl='python src/race_pace/iracing_pace_calc.py --fl'
+alias calc_f4='python src/race_pace/iracing_pace_calc.py --f4'
+
 echo "Anaconda environment is activated and ready."
+
+export PATH=$CURRENT_DIR:$PATH

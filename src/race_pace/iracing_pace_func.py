@@ -426,7 +426,7 @@ class TIME_PLOTS:
         plt.tight_layout()
         plt.show()  # Or fig2.savefig('scatterplot.png') to save instead of showing
         
-        graph_path = join(GRAPH_DIR,'{type}.png')
+        graph_path = join(GRAPH_DIR,f'{type}.png')
         
         os.makedirs(os.path.dirname(graph_path), exist_ok=True)
         fig2.savefig(graph_path)
@@ -456,7 +456,7 @@ def pace_calculator(args):
     tp.plot_scatter(highlight_driver=DRIVERS, type="Qualify")
     tp.plot_scatter(highlight_driver=DRIVERS, type="Fastest Lap")
 
-    input("Press anything to close...")
+    input("Press Enter to close...")
 
 
 # If you want a standalone example run from within this file

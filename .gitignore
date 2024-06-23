@@ -1,6 +1,6 @@
 .venv
 **/credentials.cfg
 **/test.*
-**/graphs
+**/graph
 **/*.pkl
 **/__pycache__

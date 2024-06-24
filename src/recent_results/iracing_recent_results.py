@@ -1,96 +1,181 @@
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 from iracingdataapi.client import irDataClient
+import os
+from os.path import join
+import configparser
+
+# Global
+GRAPH_DIR = join(os.path.dirname(os.path.abspath(__file__)), "graph")
+CRED = join(os.path.dirname(os.path.abspath(__file__)), "credentials.cfg")
+
+# Initialize API CLIENT
+class APIClientInitializer:
+    def __init__(self, cfg_file):
+        self.cfg_file = cfg_file
+        self.client = None
+
+    def initialize_api_client(self):
+        if not os.path.exists(self.cfg_file):
+            self.create_credentials_file()
+
+        print("Loading Credentials")
+        config = configparser.ConfigParser()
+        config.read(self.cfg_file)
+        username = config['credentials']['username']
+        password = config['credentials']['password']
+        
+        print("Establishing connection")
+        self.client = self.connect_to_api(username, password)
+        return self.client
+
+    def create_credentials_file(self):
+        create_file = input(f"Credentials file '{self.cfg_file}' does not exist. Would you like to create it? (y/n): ")
+        if create_file.lower() == 'y':
+            username = input("Enter email: ")
+            password = input("Enter password: ")
+            config = configparser.ConfigParser()
+            config['credentials'] = {
+                'username': username,
+                'password': password
+            }
+            with open(self.cfg_file, 'w') as configfile:
+                config.write(configfile)
+            print(f"Credentials saved to '{self.cfg_file}'")
+        else:
+            print("Exiting. Credentials file is required to proceed.")
+            exit(1)
+
+    def connect_to_api(self, username, password):
+        # Replace this with the actual code to initialize your API client
+        return irDataClient(username=username, password=password)
+
+CLIENT = APIClientInitializer(CRED).initialize_api_client()
+
+def test_csv(df, path='./test.csv'):
+    df.to_csv(path)
 
 class RaceData:
     """Class for storing detailed race data for a user."""
-    def __init__(self):
-        self.name           = ""
-        self.car            = ""
-        self.track          = ""
-        self.date           = ""
-        self.q_time         = ""
-        self.q_position     = 0
-        self.f_position     = ""
-        self.fast_lap       = ""
-        self.avg_clean_lap  = 0.0
-        self.incident_cnt   = 0
-        self.laps           = []
-        self.per_clean_lap  = 0.0
-        self.old_irating    = 0
-        self.new_irating    = 0
-        self.old_sr         = 0
-        self.new_sr         = 0
-        self.sof            = 0
-        self.subsession_id  = 0
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.races_data = []
+        self.fetch_race_data()
 
-    def get_date(self):
-        # Splitting the date and time parts
-        date_part, time_part = self.date.split('T')
-        year, month, day = date_part.split('-')
-        hour, minute = time_part.split(':')[:2]
+    def _convert_ticks_to_time(self, ticks):
+        seconds = ticks / 10000
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        milliseconds = int((seconds % 1) * 1000)
+        seconds = int(seconds)
+        return f"{minutes}:{seconds}.{milliseconds}"
+
+    def print_race_data(self):
+        for race in self.races_data:
+            print("\nRace Data:")
+            for key, value in race.items():
+                print(f"{key}: {value}")
+
+    def fetch_race_data(self):
+        # Fetch recent races
+        recent_races = CLIENT.stats_member_recent_races(cust_id=self.user_id)['races']
         
-        # Reformatting the date and time
-        date_str = f"{month}.{day}.{year}"
-        time_str = f"{hour}:{minute}"
-        
-        return (date_str, time_str)
-    
-    def get_ir_diff(self):
-        return (self.old_irating - self.new_irating)
-    
-    def get_sr_diff(self):
-        return (self.old_sr - self.new_sr)/100
+        if not recent_races:
+            print("No recent races found.")
+            return
+
+        # Identify the track name of the most recent race
+        track_name = recent_races[0]['track']['track_name']
+
+        # Filter all races that have the same track name
+        same_track_races = [race for race in recent_races if race['track']['track_name'] == track_name]
+
+        for race in same_track_races:
+            race_id = race['subsession_id']
+            race_result = CLIENT.result(subsession_id=race_id)
+
+            my_qual = next((r for r in race_result['session_results'][1]['results'] if r['cust_id'] == self.user_id), None)
+            my_race = next((r for r in race_result['session_results'][2]['results'] if r['cust_id'] == self.user_id), None)
+
+            my_laps = [lap for lap in CLIENT.result_lap_chart_data(subsession_id=race_id) if lap['group_id'] == self.user_id]
+            total_clean_lap_time, laps_with_empty_events, lap_list = 0, 0, []
+
+            for lap in my_laps[1:]:
+                lap_list.append({'lap_number': lap['lap_number'], 'lap_time': lap['lap_time'], 'lap_events': lap['lap_events']})
+                
+                if not lap['lap_events']:
+                    total_clean_lap_time += lap['lap_time']
+                    laps_with_empty_events += 1
+                else:
+                    pass
+                    # print(f"Lap: {lap['lap_number']} - {', '.join(lap['lap_events'])}")
+
+            average_lap_time = total_clean_lap_time / laps_with_empty_events if laps_with_empty_events else None
+            percentage_empty_events = (laps_with_empty_events / len(my_laps) * 100) if my_laps else None
+
+            race_data = {
+                'subsession_id': race_id,
+                'date': race['session_start_time'],
+                'track': race['track']['track_name'],
+                'name': my_laps[0]['name'] if my_laps else 'Unknown',
+                'car': next((r['car_name'] for r in race_result['session_results'][0]['results'] if r['cust_id'] == self.user_id), 'Unknown'),
+                'q_time': my_qual['best_lap_time'] if my_qual else 'N/A',
+                'q_position': race['start_position'],
+                'f_position': race['finish_position'],
+                'fast_lap': my_race['best_lap_time'] if my_race else 'N/A',
+                'avg_clean_lap': average_lap_time,
+                'incident_cnt': race['incidents'],
+                'laps': lap_list,
+                'per_clean_lap': percentage_empty_events,
+                'old_irating': race['oldi_rating'],
+                'new_irating': race['newi_rating'],
+                'irating_delta': race['newi_rating'] - race['oldi_rating'],
+                'old_sr': race['old_sub_level'] / 100,
+                'new_sr': race['new_sub_level'] / 100,
+                'sr_delta': (race['new_sub_level'] - race['old_sub_level']) / 100,
+                'sof': race['strength_of_field'],
+            }
+
+            self.races_data.append(race_data)
+
+    def analyze_race_week(self):
+        if not self.races_data:
+            print("No race data to analyze.")
+            return
+
+        # Sort races by date
+        sorted_races = sorted(self.races_data, key=lambda x: x['date'])
+
+        # Compare oldest and newest iRating and Safety Rating
+        oldest_irating = sorted_races[0]['old_irating']
+        newest_irating = sorted_races[-1]['new_irating']
+        irating_diff = newest_irating - oldest_irating
+
+        oldest_sr = sorted_races[0]['old_sr']
+        newest_sr = sorted_races[-1]['new_sr']
+        sr_diff = round(newest_sr - oldest_sr,2)
+
+        # Calculate averages
+        num_races = len(sorted_races)
+        avg_incidents = round(sum(race['incident_cnt'] for race in sorted_races) / num_races, 2)
+        avg_q_time = round(sum(race['q_time'] for race in sorted_races if race['q_time'] != 'N/A') / len([race for race in sorted_races if race['q_time'] != 'N/A']), 2)
+        avg_q_position = round(sum(race['q_position'] for race in sorted_races) / num_races, 2)
+        avg_sof = round(sum(race['sof'] for race in sorted_races) / num_races, 2)
+        avg_f_position = round(sum(race['f_position'] for race in sorted_races) / num_races, 2)
 
 
-    def fetch_race_data(user_id: int):
-        idc = irDataClient(username=IRACING_USERNAME, password=IRACING_PASSWORD)
-
-        # Fetching race data
-        most_recent_race = idc.stats_member_recent_races(cust_id=user_id)['races'][0]
-        race_id = most_recent_race['subsession_id']
-        race_result = idc.result(subsession_id=race_id)
-
-        my_qual = next((r for r in race_result['session_results'][1]['results'] if r['cust_id'] == user_id), None)
-        my_race = next((r for r in race_result['session_results'][2]['results'] if r['cust_id'] == user_id), None)
-
-        # Calculate average lap time and percentage of clean laps
-        my_laps = [lap for lap in idc.result_lap_chart_data(subsession_id=race_id) if lap['group_id'] == user_id]
-        total_lap_time, laps_with_empty_events, lap_list = 0, 0, []
-
-        for lap in my_laps[1:]:
-            lap_list.append({'lap_number': lap['lap_number'], 'lap_time': lap['lap_time'], 'lap_events': lap['lap_events']})
-            
-            if not lap['lap_events']:
-                total_lap_time += lap['lap_time']
-                laps_with_empty_events += 1
-            else:
-                print(f"Lap: {lap['lap_number']} - {', '.join(lap['lap_events'])}")
-
-        average_lap_time = total_lap_time / laps_with_empty_events if laps_with_empty_events else None
-        percentage_empty_events = (laps_with_empty_events / len(my_laps) * 100) if my_laps else None
-
-        self.name=my_laps[0]['name'],
-        self.car=next((r['car_name'] for r in race_result['session_results'][0]['results'] if r['cust_id'] == user_id), 'Unknown'),
-        self.track=race_result['track']['track_name'],
-        self.date=most_recent_race['session_start_time'],
-        self.q_time=my_qual['best_lap_time'] if my_qual else 'N/A',
-        self.q_position=most_recent_race['start_position'],
-        self.f_position=most_recent_race['finish_position'],
-        self.fast_lap=my_race['best_lap_time'] if my_race else 'N/A',
-        self.avg_clean_lap=average_lap_time,
-        self.incident_cnt=most_recent_race['incidents'],
-        self.laps=lap_list,
-        self.per_clean_lap=percentage_empty_events,
-        self.old_irating=most_recent_race['oldi_rating'],
-        self.new_irating=most_recent_race['newi_rating'],
-        self.old_sr=most_recent_race['old_sub_level'],
-        self.new_sr=most_recent_race['new_sub_level'],
-        self.sof=most_recent_race['strength_of_field'],
-        self.subsession_id=race_id
-
+        # Print the results
+        print(f"Track: {sorted_races[0]["track"]} - Num Races: {num_races}")
+        print(f"Average qualifying time: {self._convert_ticks_to_time(avg_q_time)}")
+        print(f"Average qualifying position: {avg_q_position}")
+        print(f"Average finishing position: {avg_f_position}")
+        print(f"iRating change: {irating_diff}")
+        print(f"Safety Rating: {sr_diff}")
+        print(f"Average incidents: {avg_incidents}")
+        print(f"Average strength of field: {avg_sof}")
 
 if __name__ == "__main__":
-    user_id = 987654
-    race_data = fetch_race_data(user_id)
-    print(race_data)
+    tyler_week = RaceData(987654)
+    tyler_week.analyze_race_week()
+    trent_week = RaceData(879436)
+    trent_week.analyze_race_week()

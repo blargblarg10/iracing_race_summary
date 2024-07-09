@@ -2,3 +2,4 @@ pandas
 iracingdataapi
 matplotlib
 statsmodels
+isoweek

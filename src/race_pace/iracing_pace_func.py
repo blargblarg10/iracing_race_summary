@@ -436,7 +436,8 @@ class TIME_PLOTS:
 DRIVERS = [
     {"driver": "Tyler Somers", "cust_id": 987654,   "color": matlib_color('78081C')},
     {"driver": "Tyler Gefroh", "cust_id": 1014098,  "color": matlib_color('008080')},
-    {"driver": "Trent Porter", "cust_id": 879436,   "color": matlib_color('E3BC9A')}
+    {"driver": "Trent Porter", "cust_id": 879436,   "color": matlib_color('E3BC9A')},
+    {"driver": "Fario Bernando", "cust_id": 105833, "color": matlib_color('ffcb00')},
 ]
 
 

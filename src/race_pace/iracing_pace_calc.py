@@ -3,18 +3,25 @@ import datetime
 import argparse
 from iracing_pace_func import pace_calculator, clean, series_list
 from math import ceil
+from zoneinfo import ZoneInfo
+from isoweek import Week
 
 # Constants
-DEFAULT_START_DATE = datetime.date(2023, 12, 12)  # The start of 2024 Season 1
+DEFAULT_START_DATE = datetime.datetime(2023, 12, 12, tzinfo=ZoneInfo("UTC"))  # The start of 2024 Season 1
 DEFAULT_SERIES_NAME = "iRacing Porsche Cup By Coach Dave Delta - Fixed"
-CURRENT_YEAR = datetime.datetime.now().year
+CURRENT_YEAR = datetime.datetime.now(ZoneInfo("UTC")).year
 
 def calculate_quarter_and_week(start_date):
-    current_date = datetime.date.today()
-    days_since_start = (current_date - start_date).days
-    weeks_since_start = days_since_start / 7
-    quarter = int((weeks_since_start // 13) % 4) + 1 # For Some reason this is base 1 while weeks is base 0
-    week = ceil(weeks_since_start % 13)  # Plus 1 to go from zero-based to one-based
+    current_date = datetime.datetime.now(ZoneInfo("UTC"))
+    
+    start_week = Week.withdate(start_date.date())
+    current_week = Week.withdate(current_date.date())
+    
+    weeks_since_start = (current_week - start_week)
+    
+    quarter = (weeks_since_start // 13) % 4 + 1  # Base 1 for quarters
+    week = weeks_since_start % 13 + 1  # Base 1 for weeks
+    
     return quarter, week
 
 def validate_args(parser):

@@ -4,6 +4,7 @@ from iracingdataapi.client import irDataClient
 import os
 from os.path import join
 import configparser
+import pandas as pd
 
 # Global
 GRAPH_DIR = join(os.path.dirname(os.path.abspath(__file__)), "graph")
@@ -155,8 +156,14 @@ class RaceData:
         newest_sr = sorted_races[-1]['new_sr']
         sr_diff = round(newest_sr - oldest_sr,2)
 
-        # Calculate averages
         num_races = len(sorted_races)
+        
+        df = pd.DataFrame(sorted_races)
+
+        df = df['sof'] + df['irating_delta']
+        week_skill_ir = df.sum()/num_races
+
+        # Calculate averages
         avg_incidents = round(sum(race['incident_cnt'] for race in sorted_races) / num_races, 2)
         avg_q_time = round(sum(race['q_time'] for race in sorted_races if race['q_time'] != 'N/A') / len([race for race in sorted_races if race['q_time'] != 'N/A']), 2)
         avg_q_position = round(sum(race['q_position'] for race in sorted_races) / num_races, 2)
@@ -173,6 +180,7 @@ class RaceData:
         print(f"Safety Rating: {sr_diff}")
         print(f"Average incidents: {avg_incidents}")
         print(f"Average strength of field: {avg_sof}")
+        print(f"Week Rating Score: {week_skill_ir}")
 
 if __name__ == "__main__":
     tyler_week = RaceData(987654)

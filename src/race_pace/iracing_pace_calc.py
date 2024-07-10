@@ -49,7 +49,6 @@ def main():
     parser.add_argument('-sl', '--series_list', action='store_true', help='Prints list of iRacing Series')
     parser.add_argument('-f', '--fixed', action='store_true', help='Indicate if the series is fixed')
 
-
     # Add arguments
     parser.add_argument('-pcup', '--pcup', action='store_true', help='Short Hand to run the current week of Porsche Cup')
     parser.add_argument('-fl', '--fl', action='store_true', help='Short Hand to run the current week of Formula Lights')
@@ -64,7 +63,7 @@ def main():
     if args.clean:
         clean()
         return 0
-    
+
     if args.season_quarter is None or args.race_week is None:
         quarter, week = calculate_quarter_and_week(DEFAULT_START_DATE)
         args.season_quarter = args.season_quarter or quarter

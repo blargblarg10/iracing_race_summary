@@ -347,17 +347,28 @@ class TIME_PLOTS:
 
     # Main function to orchestrate data fetching, processing, and plotting
 
-    def _time_df_binning(self, df, time_column, rating_colum):
-        bin_edges = list(range(0, 10001, 100))
-        bin_labels = [f"{bin_edges[i]}-{bin_edges[i+1]-1}" for i in range(len(bin_edges)-1)]
-        df = df.copy()
-        df.loc[:, 'irating_bin'] = pd.cut(df[rating_colum], bins=bin_edges, labels=bin_labels, include_lowest=True)
-        df.loc[:, 'percentile_rank'] = df.groupby('irating_bin', observed=True)[time_column].rank(pct=True)
+    def _time_df_binning(self, df, time_column, rating_column, n_bins=10):
+        df['bin'] = pd.qcut(df[rating_column], q=n_bins, labels=False)
+        
+        # Function to remove outliers from a group
+        def remove_outliers(group):
+            Q1 = group[time_column].quantile(0.25)
+            Q3 = group[time_column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            return group[(group[time_column] >= lower_bound) & (group[time_column] <= upper_bound)]
+
+        # Apply outlier removal to each bin
+        df = df.groupby('bin').apply(remove_outliers, include_groups=False)
+        
+        # Calculate percentile rank within each bin
+        df['percentile_rank'] = df.groupby('bin')[time_column].rank(pct=True)
+        
         return df
 
-
-    def plot_scatter(self, highlight_driver = [], type = "", rating_type= "iRating", position_mask = None,irating = [2000, 2500, 3000, 3500, 4000]):
-        time_column, rating_colum = self._validate_scatter_type(type, rating_type)
+    def plot_scatter(self, highlight_driver=[], type="", rating_type="iRating", position_mask=None, irating=[2000, 2500, 3000, 3500, 4000]):
+        time_column, rating_column = self._validate_scatter_type(type, rating_type)
         # Converts iracing time to ms and removes anything 
         df = self.race_df.loc[(self.race_df[time_column] >= 0)]
 
@@ -369,23 +380,23 @@ class TIME_PLOTS:
         df.loc[:, time_column] = df.loc[:, time_column]/10000
 
         # Bin the irating together to apply a color range per bin instead of total time
-        df = self._time_df_binning(df, time_column, rating_colum)
+        df_filtered = self._time_df_binning(df, time_column, rating_column)
 
         # Colors for gradients
         c = LinearSegmentedColormap.from_list('percentile_cmap', [matlib_color('8bca84'), matlib_color('4169e1'), matlib_color('ff6961')], N=100)
-        colors = c(df['percentile_rank'])
+        colors = c(df_filtered['percentile_rank'])
 
         # Scatter Plot
         fig2, ax2 = plt.subplots(figsize=(10, 6))
-        ax2.scatter(df[rating_colum], df[time_column], c=colors, alpha=0.5)
+        ax2.scatter(df_filtered[rating_column], df_filtered[time_column], c=colors, alpha=0.5)
 
         # Calculate the y-axis limits based on the fastest time
-        fastest_time = df[time_column].min()
+        fastest_time = df_filtered[time_column].min()
         lower_limit = fastest_time * 0.9995  # 0.5% lower than the fastest time
         upper_limit = fastest_time * 1.07   # 7% higher than the fastest time
 
         # Best fit and Plot Formatting
-        lowess_fitted = lowess(df[time_column], df[rating_colum], frac=0.2)    
+        lowess_fitted = lowess(df_filtered[time_column], df_filtered[rating_column], frac=0.2)    
         ax2.plot(lowess_fitted[:, 0], lowess_fitted[:, 1], '-r', label='LOWESS best fit')
         ax2.yaxis.set_major_formatter(FuncFormatter(format_time))
         ax2.yaxis.set_major_locator(MultipleLocator(0.5))
@@ -406,7 +417,7 @@ class TIME_PLOTS:
                 d_color = driver["color"]
                 d_id = driver["cust_id"]
                 highlight_df = df[df['cust_id'] == d_id]
-                ax2.scatter(highlight_df[rating_colum], highlight_df[time_column], color=d_color, edgecolor='black', alpha=0.75, s=100, label=f'Highlighted (cust_id={d_name})', zorder=3)
+                ax2.scatter(highlight_df[rating_column], highlight_df[time_column], color=d_color, edgecolor='black', alpha=0.75, s=100, label=f'Highlighted (cust_id={d_name})', zorder=3)
 
 
         # Info Text Box Stuff

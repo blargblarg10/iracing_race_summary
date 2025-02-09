@@ -449,6 +449,7 @@ DRIVERS = [
     {"driver": "Tyler Gefroh", "cust_id": 1014098,  "color": matlib_color('008080')},
     {"driver": "Trent Porter", "cust_id": 879436,   "color": matlib_color('E3BC9A')},
     {"driver": "Bernando Faria", "cust_id": 105833, "color": matlib_color('ffcb00')},
+    {"driver": "Aidan Pohl", "cust_id": 772070, "color": matlib_color('8E32D4')},
 ]
 
 

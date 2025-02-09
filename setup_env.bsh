@@ -42,3 +42,5 @@ alias calc_f4='python src/race_pace/iracing_pace_calc.py --f4'
 echo "Anaconda environment is activated and ready."
 
 export PATH=$CURRENT_DIR:$PATH
+
+clear

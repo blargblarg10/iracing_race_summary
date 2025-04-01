@@ -1,5 +1,4 @@
-
-from iracingdataapi.client import irDataClient
+from iracing_api_client import IracingAPIClient
 import os
 import shutil
 from os.path import join
@@ -12,8 +11,11 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 from matplotlib.colors import LinearSegmentedColormap
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Global
+# Add plot closing
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 
+# Global
 PKL_DIR = join(os.path.dirname(os.path.abspath(__file__)), "pkl")
 GRAPH_DIR = join(os.path.dirname(os.path.abspath(__file__)), "graph")
 CRED = join(os.path.dirname(os.path.abspath(__file__)), "credentials.cfg")
@@ -56,8 +58,8 @@ class APIClientInitializer:
             exit(1)
 
     def connect_to_api(self, username, password):
-        # Replace this with the actual code to initialize your API client
-        return irDataClient(username=username, password=password)
+        # Initialize our new API client
+        return IracingAPIClient(username=username, password=password)
 
 CLIENT = APIClientInitializer(CRED).initialize_api_client()
 
@@ -86,9 +88,8 @@ def clean():
 def save_dataframe(df, filename):
     if not os.path.exists(PKL_DIR):
         os.mkdir(PKL_DIR)
-    else:    
-        df.to_pickle(filename)
-        print(f"DataFrame saved to {filename}")
+    df.to_pickle(filename)
+    print(f"DataFrame saved to {filename}")
 
 def load_dataframe(filename):
     try:
@@ -110,7 +111,12 @@ def load_dataframe(filename):
 #   If refactoring is required. Better to do that in a separate function that calls this parent dataframe 
 ###########################################################
 def series_list():
-    return [series["series_name"] for series in CLIENT.series]
+    """Return a list of all series names available on iRacing."""
+    # The series method in our new API client might return data in a different format
+    # We'll need to adapt this to extract the series names correctly
+    series_data = CLIENT.series()
+    # Extract and return just the names
+    return [series.get('series_name', series.get('name', 'Unknown')) for series in series_data]
 
 def preprocess_lap_data(subsession_id):
     '''
@@ -133,7 +139,7 @@ def preprocess_lap_data(subsession_id):
         cust_id = lap['cust_id']
         customer_total_laps_count[cust_id] += 1
 
-        if not lap['incident'] and lap['lap_number'] > 0 and lap['lap_time'] > 0:
+        if not lap.get('incident', False) and lap.get('lap_number', 0) > 0 and lap.get('lap_time', 0) > 0:
             heapq.heappush(customer_laps[cust_id], lap['lap_time'])
             customer_clean_laps_count[cust_id] += 1
 
@@ -235,8 +241,15 @@ def fetch_race_data(series_name, season_year, season_quarter, race_week_num):
         Returns a Dataframe of that information
     '''    
     # Check if Series name is valid
-    races_list = [series['series_name'] for series in CLIENT.series]
-    series_id = next((series['series_id'] for series in CLIENT.series if series['series_name'] == series_name), None)
+    races_list = series_list()
+    series_id = None
+    
+    # Find the series ID based on the name
+    for series in CLIENT.series():
+        if series.get('series_name', series.get('name', '')) == series_name:
+            series_id = series.get('series_id', None)
+            break
+            
     if series_id is None:
         raise ValueError(f"Series '{series_name}' not found.")
 
@@ -418,72 +431,3 @@ class TIME_PLOTS:
                 d_id = driver["cust_id"]
                 highlight_df = df[df['cust_id'] == d_id]
                 ax2.scatter(highlight_df[rating_column], highlight_df[time_column], color=d_color, edgecolor='black', alpha=0.75, s=100, label=f'Highlighted (cust_id={d_name})', zorder=3)
-
-
-        # Info Text Box Stuff
-        info_text = [f"Fastest: {format_time(fastest_time)}"]
-        info_text.extend([f"3% Goal: {format_time(fastest_time*1.03)}"])
-        info_text.extend([f"7% Rule: {format_time(upper_limit)}"])
-
-        estimated_times = [self._estimate_best_lap(lowess_fitted, ir) for ir in irating]
-        info_text.extend([f"{ir} Estimate: {format_time(time)}" 
-                        for ir, time in zip(irating, estimated_times)])       
-
-        ax2.text(0.05, -0.15, "\n".join(info_text), transform=ax2.transAxes, fontsize=9, 
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
-        # Finally show the plot
-        plt.ion()
-        plt.tight_layout()
-        plt.show()  # Or fig2.savefig('scatterplot.png') to save instead of showing
-        
-        graph_path = join(GRAPH_DIR,f'{type}.png')
-        
-        os.makedirs(os.path.dirname(graph_path), exist_ok=True)
-        fig2.savefig(graph_path)
-
-        return
-
-DRIVERS = [
-    {"driver": "Tyler Somers", "cust_id": 987654,   "color": matlib_color('78081C')},
-    {"driver": "Tyler Gefroh", "cust_id": 1014098,  "color": matlib_color('008080')},
-    {"driver": "Trent Porter", "cust_id": 879436,   "color": matlib_color('E3BC9A')},
-    {"driver": "Bernando Faria", "cust_id": 105833, "color": matlib_color('ffcb00')},
-    {"driver": "Aidan Pohl", "cust_id": 772070, "color": matlib_color('8E32D4')},
-]
-
-
-def pace_calculator(args):
-    print(f"Running with: {args.series_name}, {args.series_year}, {args.season_quarter}, {args.race_week}")
-
-    # Establish connection and retrieve data    
-    # for i in CLIENT.series:
-    #     print(i["series_name"])
-    
-    race_df = fetch_race_data(args.series_name, args.series_year, args.season_quarter, args.race_week-1)
-
-    # Preprocess data for time v irating plots
-    tp = TIME_PLOTS(race_df)
-    
-    tp.plot_scatter(highlight_driver=DRIVERS, type="Best 5 Average Race Pace")
-    tp.plot_scatter(highlight_driver=DRIVERS, type="Qualify")
-    tp.plot_scatter(highlight_driver=DRIVERS, type="Fastest Lap")
-
-    input("Press Enter to close...")
-
-
-# If you want a standalone example run from within this file
-def main():
-    class Args:
-        def __init__(self, series_name, series_year, season_quarter, race_week):
-            self.series_name = series_name
-            self.series_year = series_year
-            self.season_quarter = season_quarter
-            self.race_week = race_week
-
-    default_args = Args("iRacing Porsche Cup By Coach Dave Delta - Fixed", 2024, 3, 2)
-    pace_calculator(default_args)
-
-
-if __name__ == '__main__':
-    main()

@@ -45,7 +45,7 @@ def main():
     parser.add_argument('-y', '--series_year', type=int, default=CURRENT_YEAR, help='Year of the series')
     parser.add_argument('-q', '--season_quarter', type=int, help='Quarter of the season (1-4)')
     parser.add_argument('-w', '--race_week', type=int, help='Week of the race (1-13)')
-    parser.add_argument('-c', '--clean', type=bool, help='Clean PKL Dir')
+    parser.add_argument('-c', '--clean', action='store_true', help='Clean PKL Dir')
     parser.add_argument('-sl', '--series_list', action='store_true', help='Prints list of iRacing Series')
     parser.add_argument('-f', '--fixed', action='store_true', help='Indicate if the series is fixed')
 
@@ -57,7 +57,8 @@ def main():
     args = validate_args(parser)
 
     if args.series_list:
-        print("\n".join(series_list()))
+        series = series_list()
+        print("\n".join(series))
         return 0
 
     if args.clean:

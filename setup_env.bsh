@@ -1,5 +1,5 @@
 #!/bin/bash
-
+source ~/.bashrc
 # Get the absolute path of the current directory
 CURRENT_DIR=$PWD
 
@@ -12,7 +12,10 @@ if [ ! -d "$CURRENT_DIR/.git" ]; then
 fi
 
 # Check if the directory is a Conda environment
-if conda info --envs | grep -q "$CURRENT_DIR/.venv"; then
+# Convert current dir to windows format for anaconda
+WIN_PATH=$(echo "$CURRENT_DIR/.venv" | sed 's|^/c/|C:\\\\|' | sed 's|/|\\\\|g')
+
+if conda info --envs | grep -q "$WIN_PATH"; then
     echo "Anaconda environment already exists."
 else
     # Create the environment
@@ -22,7 +25,7 @@ fi
 
 # Activate the environment
 echo "Activating Anaconda environment..."
-source activate "$CURRENT_DIR/.venv"
+conda activate "$CURRENT_DIR/.venv"
 
 # Install project specific packages from python_requirements.txt if it exists
 if [ -f "$CURRENT_DIR/python_requirements.txt" ]; then
@@ -42,5 +45,4 @@ alias calc_f4='python src/race_pace/iracing_pace_calc.py --f4'
 echo "Anaconda environment is activated and ready."
 
 export PATH=$CURRENT_DIR:$PATH
-
-clear
+export PATH="/c/Users/tssom/anaconda3/":$PATH

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iRacing Race Summary Graphs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .generate-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .generate-btn:hover {
+            background-color: #0056b3;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px;
+            display: none;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            padding: 20px;
+        }
+        .graph-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .graph-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        .error-message {
+            color: red;
+            text-align: center;
+            margin: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>iRacing Race Summary Graphs</h1>
+        <div class="controls">
+            <button class="generate-btn" onclick="generateGraphs()">Generate New Graphs</button>
+        </div>
+        <div class="loading">Generating graphs, please wait...</div>
+        <div class="error-message"></div>
+        <div class="gallery" id="graphGallery"></div>
+    </div>
+
+    <script>
+        function showLoading(show) {
+            document.querySelector('.loading').style.display = show ? 'block' : 'none';
+            document.querySelector('.generate-btn').disabled = show;
+        }
+
+        function showError(message) {
+            const errorDiv = document.querySelector('.error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.querySelector('.error-message').style.display = 'none';
+        }
+
+        async function generateGraphs() {
+            showLoading(true);
+            hideError();
+            
+            try {
+                const response = await fetch('http://localhost:5000/generate-graphs', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to generate graphs');
+                }
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    displayGraphs(data.graphs);
+                } else {
+                    showError(data.message || 'Failed to generate graphs');
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayGraphs(graphs) {
+            const gallery = document.getElementById('graphGallery');
+            gallery.innerHTML = '';
+            
+            graphs.forEach(filename => {
+                const container = document.createElement('div');
+                container.className = 'graph-container';
+                
+                const img = document.createElement('img');
+                img.src = `http://localhost:5000/graphs/${filename}`;
+                img.alt = filename.replace('.png', '').replace(/_/g, ' ');
+                img.loading = 'lazy';
+                
+                container.appendChild(img);
+                gallery.appendChild(container);
+            });
+        }
+
+        // Load any existing graphs on page load
+        window.addEventListener('load', generateGraphs);
+    </script>
+</body>
+</html>

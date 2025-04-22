@@ -259,7 +259,7 @@ class IracingAPIClient:
         data = self._make_request('data/series/stats_series')
         if data:
             # Extract just the series names
-            self.cache['series'] = [series['series_name'] for series in data]
+            self.cache['series'] = [series for series in data]
             return self.cache['series']
         return []
     

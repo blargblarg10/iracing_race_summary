@@ -1,4 +1,4 @@
-from iracing_api_client import IracingAPIClient
+from src.race_pace.iracing_api_client import IracingAPIClient
 import os
 import shutil
 from os.path import join
@@ -117,6 +117,7 @@ def series_list():
     series_data = CLIENT.series()
     # Extract and return just the names
     return [series.get('series_name', series.get('name', 'Unknown')) for series in series_data]
+
 
 def preprocess_lap_data(subsession_id):
     '''
@@ -278,6 +279,45 @@ def fetch_race_data(series_name, season_year, season_quarter, race_week_num):
 
     return df
 
+def get_iracing_date():
+    """Get the latest iRacing year, quarter and week.
+    This function provides a convoluted way to determine the latest iRacing season information
+    by examining all series data and finding the latest season/quarter combination.
+
+    Returns:
+        tuple: (year, quarter, week) containing:
+            - year (int): Current season year
+            - quarter (int): Current season quarter (1-4)
+            - week (int): Current racing week (0-12)
+            Returns (None, None, None) if no data is found
+    """    
+    series = CLIENT.series()
+    latest_year = 0
+    latest_quarter = 0
+    latest_season = None
+
+    # Find latest season
+    for s in series:
+        if s.get('seasons') and len(s['seasons']) > 0:
+            latest_season = s['seasons'][0]
+            season_year = latest_season.get('season_year', 0)
+            season_quarter = latest_season.get('season_quarter', 0)
+            season_id = latest_season.get('season_id', 0)
+            if season_year > latest_year or (season_year == latest_year and season_quarter > latest_quarter):
+                latest_year = season_year
+                latest_quarter = season_quarter
+                latest_season_id = season_id
+
+    if latest_season_id:
+        # Get current race week from season results
+        races = CLIENT.result_season_results(season_id=latest_season_id)
+        if races and races.get("results_list"):
+            # Get week from most recent race
+            week = races["results_list"][-1].get("race_week_num", 0)
+            return latest_year, latest_quarter, week
+
+    return None, None, None
+
 
 # Format time for plots
 def format_time(x, pos=None):
@@ -289,6 +329,7 @@ def format_time(x, pos=None):
 def matlib_color(color):
     r, g, b = tuple(int(color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
     return (r, g, b)
+
 
 class TIME_PLOTS:
     def __init__(self, df):
@@ -400,7 +441,7 @@ class TIME_PLOTS:
         colors = c(df_filtered['percentile_rank'])
 
         # Scatter Plot
-        fig2, ax2 = plt.subplots(figsize=(10, 6))
+        fig2, ax2 = plt.subplots(figsize=(16, 10))  # Increased from (10, 6)
         ax2.scatter(df_filtered[rating_column], df_filtered[time_column], c=colors, alpha=0.5)
 
         # Calculate the y-axis limits based on the fastest time
@@ -431,3 +472,35 @@ class TIME_PLOTS:
                 d_id = driver["cust_id"]
                 highlight_df = df[df['cust_id'] == d_id]
                 ax2.scatter(highlight_df[rating_column], highlight_df[time_column], color=d_color, edgecolor='black', alpha=0.75, s=100, label=f'Highlighted (cust_id={d_name})', zorder=3)
+        
+        # Save the plot
+        if not os.path.exists(GRAPH_DIR):
+            os.makedirs(GRAPH_DIR)
+        fig2.savefig(join(GRAPH_DIR, f'{self.series_name}_{self.track_name}_{type}_vs_{rating_type}.png'), 
+                    bbox_inches='tight', 
+                    dpi=300)
+        plt.close(fig2)
+
+def plot_series(series_name, season_year=None, season_quarter=None, race_week_num=None):
+    # Default irating values
+    irating = [2000, 2500, 3000, 3500, 4000]
+
+    if season_year is None or season_quarter is None or race_week_num is None:
+        season_year, season_quarter, race_week_num = get_iracing_date()
+    
+    # Get the race data
+    df = fetch_race_data(series_name, season_year, season_quarter, race_week_num)
+    
+    # Create plot handler object
+    time_plots = TIME_PLOTS(df)
+    
+    # Generate plots
+    for type in time_plots.ACCEPT_TYPES.keys():
+        time_plots.plot_scatter(highlight_driver=None, 
+                                type=type, 
+                                rating_type="iRating", 
+                                position_mask=None, 
+                                irating=irating)
+    
+if __name__ == "__main__":
+    plot_series(series_name="iRacing Porsche Cup by CONSPIT")
